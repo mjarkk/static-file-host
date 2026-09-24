@@ -35,4 +35,4 @@ static-file-host systemd --listen 0.0.0.0:8080 | sudo tee /etc/systemd/system/st
 sudo systemctl enable --now static-file-host
 ```
 
-The unit runs as the current user, with the current directory as its working directory. It is sandboxed and can write only to that directory.
+The unit runs as the current user, with the current directory as its working directory.

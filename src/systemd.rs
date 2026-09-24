@@ -29,12 +29,6 @@ pub fn unit(options: &Options) -> Result<String, String> {
         .map(|arg| quote(&arg.replace('$', "$$")))
         .collect();
 
-    let data = dir.join(&options.data);
-    let data = data.canonicalize().unwrap_or(data);
-    let mut writable = vec![quote(&dir.display().to_string())];
-    if !data.starts_with(&dir) {
-        writable.push(quote(&data.display().to_string()));
-    }
     let capabilities = if options.listen.port() < 1024 {
         "CAP_NET_BIND_SERVICE"
     } else {
@@ -58,27 +52,6 @@ RestartSec=2
 Environment=MALLOC_ARENA_MAX=2
 LimitNOFILE=65536
 UMask=0077
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths={writable}
-PrivateTmp=yes
-PrivateDevices=yes
-ProtectKernelTunables=yes
-ProtectKernelModules=yes
-ProtectKernelLogs=yes
-ProtectControlGroups=yes
-ProtectClock=yes
-ProtectHostname=yes
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
-RestrictNamespaces=yes
-RestrictRealtime=yes
-RestrictSUIDSGID=yes
-LockPersonality=yes
-MemoryDenyWriteExecute=yes
-SystemCallArchitectures=native
-SystemCallFilter=@system-service
-CapabilityBoundingSet={capabilities}
 AmbientCapabilities={capabilities}
 
 [Install]
@@ -86,7 +59,6 @@ WantedBy=multi-user.target
 ",
         working_directory = dir.display().to_string().replace('%', "%%"),
         exec_start = exec_start.join(" "),
-        writable = writable.join(" "),
     ))
 }
 
