@@ -21,7 +21,7 @@ curl -H "Authorization: Bearer $TOKEN" -T Dockerfile http://localhost:8080/
 - The URL keeps the upload's extension: `a.b.c` becomes `<id>.c`. A name with no dot is used whole: `Dockerfile` becomes `<id>.Dockerfile`. Only the id is used to find the file, so `<id>` without the extension works too.
 - The content type comes from the upload. When the upload has none, or sends `application/octet-stream`, the type is detected from the file's first bytes and its extension. UTF-8 text is served with `charset=utf-8`.
 - Uploaded URLs use `X-Forwarded-Proto` and `X-Forwarded-Host` (or `Host`). Pass `--public-url https://files.example.com` to set the base yourself.
-- To change the token, write a new one to `data/token` and restart.
+- The token comes from `--token`, else the `STATIC_FILE_HOST_TOKEN` environment variable, else `data/token`. Other users on the machine can see `--token` in `ps`, so prefer the variable. To change the file token, write a new one to `data/token` and restart.
 
 ## Serving
 
@@ -35,4 +35,20 @@ static-file-host systemd --listen 0.0.0.0:8080 | sudo tee /etc/systemd/system/st
 sudo systemctl enable --now static-file-host
 ```
 
-The unit runs as the current user, with the current directory as its working directory.
+The unit runs as the current user, with the current directory as its working directory. It reads the token from `data/token`; `--token` is refused because the unit file is readable by every user.
+
+## Docker
+
+```sh
+docker build -t static-file-host .
+docker run -d --name static-file-host -p 8080:8080 -v static-file-host:/data static-file-host
+docker exec static-file-host static-file-host token    # or: docker logs static-file-host
+```
+
+Set the token with `-e STATIC_FILE_HOST_TOKEN=…`. To pass other options, give the whole command, `--listen` included:
+
+```sh
+docker run … static-file-host serve --listen 0.0.0.0:8080 --public-url https://files.example.com
+```
+
+The container runs as uid 65532. A named volume gets that owner by itself; a bind mount needs `chown 65532:65532` first.

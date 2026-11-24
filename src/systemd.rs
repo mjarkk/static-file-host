@@ -3,6 +3,12 @@ use std::env;
 use crate::Options;
 
 pub fn unit(options: &Options) -> Result<String, String> {
+    if options.token.is_some() {
+        return Err(format!(
+            "--token would be readable by every user in the unit; write it to {} instead",
+            options.data.join("token").display()
+        ));
+    }
     let dir = env::current_dir().map_err(|e| format!("reading current directory: {e}"))?;
     let exe = env::current_exe()
         .and_then(|exe| exe.canonicalize())

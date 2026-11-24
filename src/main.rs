@@ -5,9 +5,12 @@ mod server;
 mod store;
 mod systemd;
 
+use std::env::{self, VarError};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::ExitCode;
+
+const TOKEN_ENV: &str = "STATIC_FILE_HOST_TOKEN";
 
 const HELP: &str = "\
 static-file-host: upload files with a token, view them publicly by random id
@@ -23,6 +26,8 @@ OPTIONS:
     --public-url URL    base of returned urls, e.g. https://files.example.com
                         [default: from X-Forwarded-Proto/X-Forwarded-Host/Host]
     --threads N         event loop threads             [default: 1]
+    --token TOKEN       upload token; other users can see it in ps
+                        [default: $STATIC_FILE_HOST_TOKEN, else DIR/token]
 
 UPLOAD:
     curl -H 'Authorization: Bearer TOKEN' -F file=@photo.png http://HOST/
@@ -45,14 +50,13 @@ pub struct Options {
     pub data: PathBuf,
     pub public_url: Option<String>,
     pub threads: usize,
+    pub token: Option<String>,
 }
 
 fn main() -> ExitCode {
     let result = parse_args().and_then(|(command, options)| match command {
         Command::Serve => serve(options),
-        Command::Token => store::load_or_create_token(&options.data)
-            .map(|(token, _)| println!("{token}"))
-            .map_err(|e| format!("reading token: {e}")),
+        Command::Token => upload_token(&options).map(|(token, _)| println!("{token}")),
         Command::Systemd => systemd::unit(&options).map(|unit| print!("{unit}")),
         Command::Help => {
             print!("{HELP}");
@@ -71,8 +75,7 @@ fn main() -> ExitCode {
 fn serve(options: Options) -> Result<(), String> {
     let store = store::Store::open(options.data.clone())
         .map_err(|e| format!("opening {}: {e}", options.data.display()))?;
-    let (token, created) =
-        store::load_or_create_token(&options.data).map_err(|e| format!("reading token: {e}"))?;
+    let (token, created) = upload_token(&options)?;
     if created {
         eprintln!("created upload token: {token}");
     }
@@ -97,8 +100,28 @@ fn serve(options: Options) -> Result<(), String> {
         .map_err(|e| format!("listening on {}: {e}", options.listen))
 }
 
+/// Returns the token and whether it was just created in the data directory.
+fn upload_token(options: &Options) -> Result<(String, bool), String> {
+    let (token, source) = match (&options.token, env::var(TOKEN_ENV)) {
+        (Some(token), _) => (token.clone(), "--token"),
+        (None, Ok(token)) => (token, TOKEN_ENV),
+        (None, Err(VarError::NotUnicode(_))) => {
+            return Err(format!("{TOKEN_ENV} is not valid UTF-8"));
+        }
+        (None, Err(VarError::NotPresent)) => {
+            return store::load_or_create_token(&options.data)
+                .map_err(|e| format!("reading token: {e}"));
+        }
+    };
+    let token = token.trim();
+    if token.is_empty() {
+        return Err(format!("{source} is empty"));
+    }
+    Ok((token.to_owned(), false))
+}
+
 fn parse_args() -> Result<(Command, Options), String> {
-    let mut args = std::env::args().skip(1).peekable();
+    let mut args = env::args().skip(1).peekable();
     let command = match args.peek().map(String::as_str) {
         Some("serve") => Command::Serve,
         Some("token") => Command::Token,
@@ -116,6 +139,7 @@ fn parse_options(mut args: impl Iterator<Item = String>) -> Result<Options, Stri
         data: PathBuf::from("data"),
         public_url: None,
         threads: 1,
+        token: None,
     };
     while let Some(arg) = args.next() {
         if arg == "-h" || arg == "--help" {
@@ -128,7 +152,7 @@ fn parse_options(mut args: impl Iterator<Item = String>) -> Result<Options, Stri
         };
         if !matches!(
             flag.as_str(),
-            "--listen" | "--data" | "--public-url" | "--threads"
+            "--listen" | "--data" | "--public-url" | "--threads" | "--token"
         ) {
             return Err(format!("unknown option {flag}, see --help"));
         }
@@ -151,6 +175,7 @@ fn parse_options(mut args: impl Iterator<Item = String>) -> Result<Options, Stri
                     .filter(|&n| n > 0)
                     .ok_or_else(|| format!("--threads {value}: expected a positive number"))?
             }
+            "--token" => options.token = Some(value),
             _ => unreachable!(),
         }
     }
