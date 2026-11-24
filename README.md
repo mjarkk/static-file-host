@@ -40,15 +40,16 @@ The unit runs as the current user, with the current directory as its working dir
 ## Docker
 
 ```sh
-docker build -t static-file-host .
-docker run -d --name static-file-host -p 8080:8080 -v static-file-host:/data static-file-host
+docker run -d --name static-file-host -p 8080:8080 -v static-file-host:/data ghcr.io/mjarkk/static-file-host:latest
 docker exec static-file-host static-file-host token    # or: docker logs static-file-host
 ```
+
+Images for amd64 and arm64 are published for every git tag. To build one yourself, run `docker build -t static-file-host .` and use `static-file-host` as the image name.
 
 Set the token with `-e STATIC_FILE_HOST_TOKEN=…`. To pass other options, give the whole command, `--listen` included:
 
 ```sh
-docker run … static-file-host serve --listen 0.0.0.0:8080 --public-url https://files.example.com
+docker run … ghcr.io/mjarkk/static-file-host:latest serve --listen 0.0.0.0:8080 --public-url https://files.example.com
 ```
 
 The container runs as uid 65532. A named volume gets that owner by itself; a bind mount needs `chown 65532:65532` first.
