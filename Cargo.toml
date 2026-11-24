@@ -2,6 +2,7 @@
 name = "static-file-host"
 version = "0.1.0"
 edition = "2024"
+license = "WTFPL"
 
 [dependencies]
 bytes = "1.12.1"
