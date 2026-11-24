@@ -44,7 +44,7 @@ docker run -d --name static-file-host -p 8080:8080 -v static-file-host:/data ghc
 docker exec static-file-host static-file-host token    # or: docker logs static-file-host
 ```
 
-Images for amd64 and arm64 are published for every git tag. To build one yourself, run `docker build -t static-file-host .` and use `static-file-host` as the image name.
+Images for amd64 and arm64 are published for every GitHub release. To build one yourself, run `docker build -t static-file-host .` and use `static-file-host` as the image name.
 
 Set the token with `-e STATIC_FILE_HOST_TOKEN=…`. To pass other options, give the whole command, `--listen` included:
 
